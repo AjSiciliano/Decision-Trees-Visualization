@@ -293,10 +293,19 @@ for i in images:
 
     predicted_image=Image.new(mode = "RGB",size=(original_image.width,original_image.height),color=(255, 255, 255))
     
+    image = original_image
+
+    accuracy = 0
+
     for x in range(predicted_image.width):
         for y in range(predicted_image.height):
             if tree.evaluate(x,y):
                 predicted_image.putpixel( (x,y), (0,0,0))
+                
+            if(tree.evaluate(x,y) == actual_class(x,y)):
+                accuracy += 1
+
+    print("Accuracy: " + str(accuracy / (original_image.width * original_image.height)))
 
     predicted_image.save(i + "_predicted.jpg")
 
