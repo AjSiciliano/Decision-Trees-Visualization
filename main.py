@@ -8,7 +8,7 @@ image = original_image
 width, height = 0,0
 
 def set_image(file_name):
-    global image, width, height
+    global image, width, height,original_image
 
     original_image = Image.open(file_name, 'r').convert('RGB')
     image = original_image
@@ -16,28 +16,36 @@ def set_image(file_name):
 
 def actual_class(x, y): #returns True for positive, False for Negative
     #https://stackoverflow.com/questions/138250/how-to-read-the-rgb-value-of-a-given-pixel-in-python
-    pixel = image.getdata()[image.size[0]*y+x]
 
-    #if black, its inside, therefore positive, if white its 255 therefore negative
-    return True if pixel[0] == 0 else False
+    if(image.size[0] != 0 and image.size[1] != 0):
+        pixel = image.getdata()[image.size[0]*y+x]
+
+        #if black, its inside, therefore positive, if white its 255 therefore negative
+        return True if pixel[0] == 0 else False
+    else:
+        return False
 
 #_______________________________________________________________________________________________#
 
-x_threshold, y_threshold  = 0,0
-
-def convert_cord(value_x, value_y):
-    return [value_x < x_threshold, value_y < y_threshold]
-
 def calculate_entropy(total_pos, total):
-    prob_pos = total_pos / total
-    prob_neg = 1 - prob_pos
 
-    if(prob_pos != 0 and prob_neg != 0):
-        return -prob_pos*math.log2(prob_pos)-prob_neg*math.log2(prob_neg)
-    elif(prob_pos == 0):
-        return -prob_neg*math.log2(prob_neg)
+    if(total != 0):
+        prob_pos = total_pos / total
+        prob_neg = 1 - prob_pos
+
+        if(prob_pos != 0 and prob_neg != 0):
+            return -prob_pos*math.log2(prob_pos)-prob_neg*math.log2(prob_neg)
+        elif(prob_pos == 0 and prob_neg == 0):
+            return 0
+        elif(prob_neg == 0):
+            return -prob_pos*math.log2(prob_pos)
+        else:
+            return -prob_neg*math.log2(prob_neg)
+
+
     else:
-        return -prob_pos*math.log2(prob_pos)
+        return 0
+    
 
 def find_info_gains(thresholds_x, thresholds_y):
 
@@ -56,23 +64,31 @@ def find_info_gains(thresholds_x, thresholds_y):
                 total_positive += 1
 
                 for threshold_index in range(len(thresholds_x)):
+
                     if(x < thresholds_x[threshold_index]):
                         total_below_positive_x[threshold_index] += 1
 
+
                 for threshold_index in range(len(thresholds_y)):
+
                     if(y < thresholds_y[threshold_index]):
                         total_below_positive_y[threshold_index]+=1
+
 
     hT = calculate_entropy(total_positive,total)
 
     def info_gain(thresholds, total_below_positive_attribute,multiplier):
 
         info_gain = []
-
+        # print(thresholds)
+        # print(total_below_positive_attribute)
         for threshold_index in range(len(thresholds)):
+
             thresh = thresholds[threshold_index]
 
-            total_below = int(math.ceil(thresh - 1)) * multiplier
+            # print(multiplier)
+
+            total_below = int(math.ceil(thresh - 1) + 1) * (multiplier)
 
             total_above = total - total_below
 
@@ -81,8 +97,9 @@ def find_info_gains(thresholds_x, thresholds_y):
             total_above_positive = total_positive - total_below_positive
 
             average_entropy_below = (total_below/total)*calculate_entropy(total_below_positive,total_below) 
-            average_entropy_above = (total_above/total)*calculate_entropy(total_above_positive,total_above)
 
+            average_entropy_above = (total_above/total)*calculate_entropy(total_above_positive,total_above)
+            # print(info_gain)
             info_gain.append(hT - (average_entropy_below + average_entropy_above))
 
         return info_gain
@@ -95,7 +112,7 @@ def find_thresholds():
 
     #X
     previous = [0,actual_class(0,0)]
-
+    true_x = False
     for x in range(width):
 
         for y in range(height):
@@ -105,10 +122,14 @@ def find_thresholds():
                 previous = [x,actual_class(x,y)]
                 break
 
+            if actual_class(x,y):
+                true_x = actual_class(x,y)
+
             previous = [x,actual_class(x,y)]
 
     #Y
     previous = [0,actual_class(0,0)]
+    true_y = False
     for y in range(height):
 
         for x in range(width):
@@ -117,42 +138,26 @@ def find_thresholds():
                 y_thresholds.append((previous[0] + y) / 2)
                 break
 
+            if actual_class(x,y):
+                true_y = actual_class(x,y)
+
             previous = [y,actual_class(x,y)]
 
     info_gains = find_info_gains(x_thresholds,y_thresholds)
-    
+
+    x_end_case = [width if true_x else 0, 0]
+    y_end_case = [height if true_y else 0, 0]
 
     if len(info_gains[1]) == 0 and len(info_gains[0]) == 0:
-        return [[0,0],[0,0]]
+        return [x_end_case,y_end_case]
     elif (len(info_gains[1]) == 0):
-        return [[x_thresholds[info_gains[0].index(max(info_gains[0]))],max(info_gains[0])],[0,0]]
+        return [[x_thresholds[info_gains[0].index(max(info_gains[0]))],max(info_gains[0])],y_end_case]
     elif (len(info_gains[0]) == 0):
-        return [[0,0],[x_thresholds[info_gains[0].index(max(info_gains[0]))],max(info_gains[0])]]
+        return [x_end_case,[x_thresholds[info_gains[0].index(max(info_gains[0]))],max(info_gains[0])]]
 
     return [[x_thresholds[info_gains[0].index(max(info_gains[0]))],max(info_gains[0])],[y_thresholds[info_gains[1].index(max(info_gains[1]))],max(info_gains[1])]]
 
 #_______________________________________________________________________________________________#
-
-def subset_x(x_threshold):
-    left = []
-    right = []
-
-    for x in range(width):
-        for y in range(height):
-            left.append(x,y,actual_class(x,y)) if x < x_threshold else right.append(x,y,actual_class(x,y))
-
-    return [left, right]
-
-def subset_y(y_threshold):
-    left = []
-    right = []
-
-    for y in range(width):
-        for x in range(height):
-            #left.append([x,y,actual_class(x,y)]) if y < y_threshold else right.append([x,y,actual_class(x,y)])
-            left.append(actual_class(x,y)) if y < y_threshold else right.append(actual_class(x,y))
-
-    return [left, right]
 
 class node:
 
@@ -163,41 +168,50 @@ class node:
         self.isLeaf = isLeaf
         self.threshold = 0
         self.attribute = attr
+        self.printed = ["","",""]
 
-    def guess(self,value):
-        return value < threshold
+        self.tree = [[],[],[]]
 
-    def evaluate(self,value):
+    def guess(self,x,y,b):
+        value = x if b else y
 
-        if self.isLeaf:
-            return self.guess(value)
+        if(value < self.threshold):
+            if self.children[0].isLeaf:
+                return True
+            return self.children[0].guess(x,y,not b)
         else:
-            if value < threshold:
-                return self.children[0].evaluate(value)
-            else:
-                return self.children[1].evaluate(value)
+            if self.children[1].isLeaf:
+                return False
+            return self.children[1].guess(x,y,not b)
 
-    #def __init__(self,isLeaf,value,file,index):
+    def evaluate(self,x,y):
+        return self.guess(x,y,self.attribute)
+        
 
     def build(self,target_thresholds):
         global image
         global width
         global height
+        global original_image
 
         x_thresh, x_infogain = target_thresholds[0]
         y_thresh, y_infogain = target_thresholds[1]
 
         if(self.attribute == None): #Root-Node
-            self.attribute = x_infogain > y_infogain #False is Y True is X
+            self.attribute = x_infogain >= y_infogain #False is Y True is X
+            # print(self.attribute)
             self.threshold = x_thresh if self.attribute else y_thresh
 
-        left_image = original_image.crop((0,0,width,y_thresh)) #left Y TOP
-        right_image = original_image.crop((0,math.ceil(y_thresh - 1),width,height)) #right Y  BOTTOM
         
+        left_image = original_image.crop((0,0,original_image.size[0],math.ceil(y_thresh - 1) + 1)) #left Y TOP
+
+        right_image = original_image.crop((0,math.ceil(y_thresh - 1) + 1,original_image.size[0],original_image.size[1])) #right Y  BOTTOM
+
         #if self.attribute: #if its an X
-        if self.attribute: #attribite is treu if X
-            left_image = original_image.crop((0,0,width - math.ceil(x_thresh - 1),height))
-            right_image = original_image.crop((math.ceil(x_thresh - 1),0,width,height))
+        if self.attribute: #attribite is true if X
+            left_image = original_image.crop((0,0,math.ceil(x_thresh - 1) + 1,original_image.size[1]))
+            right_image = original_image.crop((math.ceil(x_thresh - 1) + 1,0,original_image.size[0],original_image.size[1]))
+            
 
         image = left_image
         width, height = image.size
@@ -205,79 +219,89 @@ class node:
 
         image = right_image
         width, height = image.size
+
         right_thresh = find_thresholds()
 
-        left_node = node(self.index + 1 == 2,self.index + 1,not self.attribute)
-        left_node.threshold = left_thresh[0 if self.attribute else 1]
+        left_new_thresh = left_thresh[0 if self.attribute else 1][0]
 
-        right_node = node(self.index + 1 == 2,self.index + 1,not self.attribute)
-        right_node.threshold = right_thresh[0 if self.attribute else 1]
+        left_node = node(self.index + 1 == 2 or left_new_thresh == 0,self.index + 1,not self.attribute)
+
+        left_node.threshold = left_new_thresh
+
+        right_new_thresh = right_thresh[0 if self.attribute else 1][0]
+        right_node = node(self.index + 1 == 2 or right_new_thresh == 0,self.index + 1,not self.attribute)
+
+        right_node.threshold = right_new_thresh
 
         self.children.append(left_node)
         self.children.append(right_node)
 
         if(self.children[0].isLeaf != True):
             self.children[0].build(left_thresh)
+
         if(self.children[1].isLeaf != True):
             self.children[1].build(right_thresh)
-    
-    def print_help(self,current):
+        
 
-        if current.isLeaf == True:
-            return "|" + str(self.threshold) + "-" + str(self.attribute) + "|"
-        else:
-            return "\n" + str(current.print_help(current.children[0])) + " " + str(current.index) +  " " + str(current.print_help(current.children[0]))
+    def stringify(self):
+
+        if(self.index < 2):
+            s = "X:" + str(self.threshold) if self.attribute else "Y:" + str(self.threshold)
+
+            if(self.isLeaf):
+                # s = "X" if self.attribute else "Y"
+                s = "LEAF"
+
+            return s
+        return ""
+
+    def print_help(self,current,position):
+        
+        self.tree[current.index].append(current)
+
+        if current.isLeaf == False:
+
+            self.print_help(current.children[0], "left:" + str(position)) #left
+            self.print_help(current.children[1], "right:" + str(position)) #right
+
 
     def print_tree(self):
-        if self.isLeaf == True:
-            print(self.attribute)
-        else:
-            print(str(self.attribute) + "-Root")
-            print(self.print_help(self.children[0]))
-            print(self.print_help(self.children[1]))
+        self.tree = [[],[],[]]
+        self.tree[self.index].append([])
 
+        if self.isLeaf == False:
+            self.print_help(self.children[0], "left")
+            self.print_help(self.children[1], "right")
+
+        length = len(self.stringify())
+
+        for d in self.tree:
+            row = ""
+
+            if len(d) == 1:
+                row += " "*(length*2) + str(self.stringify()) + " "*(length*2)
+            else:
+                for element in d:
+                    row += (" "*int(length/element.index) + str(element.stringify()) + " "*int(length/element.index))
+            print(row)
+            print("\n")
+            
 #_______________________________________________________________________________________________#
 
 
-#def __init__(self,isLeaf,value,file,index):
+images = ["all_black.jpg", "all_white.jpg", "circle.jpg", "circle2.jpg", "shape3.jpg"]
 
-set_image("circle.jpg")
-tree = node(False,0,None)
-tree.build(find_thresholds())
+for image in images:
+    print("|" + image.upper() + "|\n")
+    set_image(image)
+    tree = node(False,0,None)
+    tree.build(find_thresholds())
+    tree.print_tree()
+    
+    print(tree.evaluate(46,200))
 
-tree.print_tree()
 
 #___________References___________#
 
 #https://stackoverflow.com/questions/138250/how-to-read-the-rgb-value-of-a-given-pixel-in-python
-
-# def repeatable(w,h,bb): #bool is X if true, bool is Y if false
-
-#         thresholds = []
-        
-#         previous = [0,actual_class(0,0)]
-
-#         for ww in range(w):
-#             for hh in range(h):
-#                 y = ww
-#                 x = hh
-
-#                 if(bb == True): #X
-#                     x = ww
-#                     y = hh
-
-#                 if actual_class(x,y) != previous[1]:
-#                     thresholds.append((previous[0] + ww) / 2)
-#                     previous = [ww,actual_class(x,y)]
-#                     break
-
-#                 previous = [ww,actual_class(x,y)]
-
-#         return thresholds
-
-#     #X
-#     x_thresholds = repeatable(width,height,True)
-
-#     #Y
-#     y_thresholds = repeatable(height,width,False)
 
