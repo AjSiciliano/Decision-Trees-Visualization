@@ -168,8 +168,6 @@ class node:
         self.isLeaf = isLeaf
         self.threshold = 0
         self.attribute = attr
-        self.printed = ["","",""]
-
         self.tree = [[],[],[]]
 
     def guess(self,x,y,b):
@@ -186,7 +184,6 @@ class node:
 
     def evaluate(self,x,y):
         return self.guess(x,y,self.attribute)
-        
 
     def build(self,target_thresholds):
         global image
@@ -199,20 +196,16 @@ class node:
 
         if(self.attribute == None): #Root-Node
             self.attribute = x_infogain >= y_infogain #False is Y True is X
-            # print(self.attribute)
             self.threshold = x_thresh if self.attribute else y_thresh
 
-        
         left_image = original_image.crop((0,0,original_image.size[0],math.ceil(y_thresh - 1) + 1)) #left Y TOP
 
         right_image = original_image.crop((0,math.ceil(y_thresh - 1) + 1,original_image.size[0],original_image.size[1])) #right Y  BOTTOM
 
-        #if self.attribute: #if its an X
         if self.attribute: #attribite is true if X
             left_image = original_image.crop((0,0,math.ceil(x_thresh - 1) + 1,original_image.size[1]))
             right_image = original_image.crop((math.ceil(x_thresh - 1) + 1,0,original_image.size[0],original_image.size[1]))
-            
-
+        
         image = left_image
         width, height = image.size
         left_thresh = find_thresholds()
@@ -221,7 +214,6 @@ class node:
         width, height = image.size
 
         right_thresh = find_thresholds()
-
         left_new_thresh = left_thresh[0 if self.attribute else 1][0]
 
         left_node = node(self.index + 1 == 2 or left_new_thresh == 0,self.index + 1,not self.attribute)
@@ -291,15 +283,22 @@ class node:
 
 images = ["all_black.jpg", "all_white.jpg", "circle.jpg", "circle2.jpg", "shape3.jpg"]
 
-for image in images:
-    print("|" + image.upper() + "|\n")
-    set_image(image)
-    tree = node(False,0,None)
-    tree.build(find_thresholds())
-    tree.print_tree()
-    
-    print(tree.evaluate(46,200))
+for i in images:
+    print("|" + i.upper() + "|\n")
 
+    set_image(i)
+    tree = node(False,0,None)
+    tree.build(find_thresholds()) #call on the root node
+    tree.print_tree() #makes the tree, needs to be called before evaluate
+
+    predicted_image=Image.new(mode = "RGB",size=(original_image.width,original_image.height),color=(255, 255, 255))
+    
+    for x in range(predicted_image.width):
+        for y in range(predicted_image.height):
+            if tree.evaluate(x,y):
+                predicted_image.putpixel( (x,y), (0,0,0))
+
+    predicted_image.save(i + "_predicted.jpg")
 
 #___________References___________#
 
