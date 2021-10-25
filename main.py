@@ -281,7 +281,7 @@ class node:
 #_______________________________________________________________________________________________#
 
 
-images = ["all_black.jpg", "all_white.jpg", "circle.jpg", "circle2.jpg", "shape3.jpg"]
+images = ["all_black.jpg", "all_white.jpg", "circle.jpg", "circle2.jpg", "shape3.jpg", "circle3.jpg", "mushroom.jpg", "triangle.jpg"]
 
 for i in images:
     print("|" + i.upper() + "|\n")
@@ -297,12 +297,14 @@ for i in images:
 
     accuracy = 0
 
+    #image.show()
     for x in range(predicted_image.width):
         for y in range(predicted_image.height):
+
             if tree.evaluate(x,y):
                 predicted_image.putpixel( (x,y), (0,0,0))
                 
-            if(tree.evaluate(x,y) == actual_class(x,y)):
+            if(tree.evaluate(x,y) == True and actual_class(x,y) == True):
                 accuracy += 1
 
     print("Accuracy: " + str(accuracy / (original_image.width * original_image.height)))
