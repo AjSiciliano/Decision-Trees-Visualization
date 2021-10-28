@@ -74,7 +74,6 @@ def find_info_gains(thresholds_x, thresholds_y):
                     if(y < thresholds_y[threshold_index]):
                         total_below_positive_y[threshold_index]+=1
 
-
     hT = calculate_entropy(total_positive,total)
 
     def info_gain(thresholds, total_below_positive_attribute,multiplier):
@@ -86,18 +85,16 @@ def find_info_gains(thresholds_x, thresholds_y):
 
             thresh = thresholds[threshold_index]
 
-            # print(multiplier)
+            #print(multiplier)
 
             total_below = int(math.ceil(thresh - 1) + 1) * (multiplier)
-
             total_above = total - total_below
 
             total_below_positive = total_below_positive_attribute[threshold_index]
-
             total_above_positive = total_positive - total_below_positive
 
-            average_entropy_below = (total_below/total)*calculate_entropy(total_below_positive,total_below) 
 
+            average_entropy_below = (total_below/total)*calculate_entropy(total_below_positive,total_below) 
             average_entropy_above = (total_above/total)*calculate_entropy(total_above_positive,total_above)
             # print(info_gain)
             info_gain.append(hT - (average_entropy_below + average_entropy_above))
@@ -279,7 +276,6 @@ class node:
             print("\n")
             
 #_______________________________________________________________________________________________#
-
 
 images = ["all_black.jpg", "all_white.jpg", "circle.jpg", "circle2.jpg", "shape3.jpg", "circle3.jpg", "mushroom.jpg", "triangle.jpg"]
 
