@@ -47,7 +47,7 @@ def build_data():
     return [data,data_class]
 
 #_______________________________________________________________________________________________#
-images = ["circle", "shape3", "mushroom", "triangle"]
+images = ["circle", "shape3", "mushroom", "triangle", "noisey_circle", "noisey_shape3", "noisey_mushroom","noisey_triangle"]
 
 for i in images:
     print("|"+i+"|\n")
@@ -66,29 +66,34 @@ for i in images:
     clfs = []
     for ccp_alpha in ccp_alphas:
         clf = DecisionTreeClassifier(random_state=1,ccp_alpha=ccp_alpha)
+    #print(help(clf))
         clf.fit(X_train, y_train)
         clfs.append(clf)
 
     for c in clfs:
+        #each one these C's is a DecisionTreeClassifier
+        #get accurcacies from decision tree classifier
 
-        predicted_image=Image.new(mode = "RGB",size=(original_image.width,original_image.height),color=(255, 255, 255))
+
+        # predicted_image=Image.new(mode = "RGB",size=(original_image.width,original_image.height),color=(255, 255, 255))
     
-        image = original_image
+        # image = original_image
 
-        for x in range(predicted_image.width):
-            for Y in range(predicted_image.height):
+        # for x in range(predicted_image.width):
+        #     for Y in range(predicted_image.height):
 
-                if c.predict([[x,Y]])[0]:
-                    predicted_image.putpixel( (x,Y), (0,0,0))
+        #         if c.predict([[x,Y]])[0]:
+        #             predicted_image.putpixel( (x,Y), (0,0,0))
 
-        predicted_image.save(i + "/alpha_" + str(c.ccp_alpha) + "_predicted.jpg")
+        # predicted_image.save(i + "/alpha_" + str(c.ccp_alpha) + "_predicted.jpg")
 
-    # print(confusion_matrix(y_test, y_pred))
-    # print(classification_report(y_test, y_pred))
-
-
-
-
+        print("_"*50 + "alpha:" + str(c.ccp_alpha) + "_"*50)
+        y_pred = c.predict(X_test)
+        print(confusion_matrix(y_test, y_pred))
+        print(classification_report(y_test, y_pred))
+        
+        print("_"*(100+len(str(c.ccp_alpha))))
+        
 
 
 #___________References___________#
