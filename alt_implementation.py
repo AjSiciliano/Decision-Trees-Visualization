@@ -7,6 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 from sklearn import tree
+from chefboost import Chefboost as chef
 #_______________________________________________________________________________________________#
 
 original_image = Image.new('RGB', (0,0))
@@ -59,6 +60,7 @@ for i in images:
     data_feature_names = ['X','Y']
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.30)
+    
 
     path= DecisionTreeClassifier(random_state=1).cost_complexity_pruning_path(X_train, y_train)
     ccp_alphas, impurities = path.ccp_alphas, path.impurities
@@ -73,6 +75,7 @@ for i in images:
     for c in clfs:
         #each one these C's is a DecisionTreeClassifier
         #get accurcacies from decision tree classifier
+
 
 
         # predicted_image=Image.new(mode = "RGB",size=(original_image.width,original_image.height),color=(255, 255, 255))
