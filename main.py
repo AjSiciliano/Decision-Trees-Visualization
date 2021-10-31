@@ -1,8 +1,19 @@
 from PIL import Image
 import math
 import numpy as np
+from collections import Counter
+from termcolor import colored
 
-#_______________________________________________________________________________________________#
+#_____________________________________________Methods__________________________________________________#
+
+verbose = True
+
+def printer(text, color=None): 
+    if verbose:
+        if color != None:
+            print(colored(text, color))
+        else:
+            print(text)
 
 def build_data_from_image(file_name):
 
@@ -14,7 +25,7 @@ def build_data_from_image(file_name):
     for x in range(width):
         column = []
         for y in range(height):
-            pixel = original_image.getdata()[original_image.size[0]*(height-y-1)+x]
+            pixel = original_image.getdata()[original_image.size[0]*y+x]
             column.append(pixel[0] == 0)
 
         data.append(column)
@@ -137,9 +148,7 @@ def find_thresholds(data_input):
 
     return [x_best_threshold, y_best_threshold]
 
-#_______________________________________________________________________________________________#
-
-
+#______________________________________________Tree___________________________________________________#
 class node:
 
     def __init__(self,isLeaf,depth,is_x):
@@ -148,6 +157,7 @@ class node:
         self.isLeaf = isLeaf
         self.is_x = is_x
         self.children = [None,None]
+        self.value = None
 
     def stringify(self):
         if(self.isLeaf):
@@ -155,41 +165,37 @@ class node:
         else:
             return "N"
 
-
-    def evaluate_helper(self,x,y,result):
-
+    def evaluate_helper(self,x,y):
         if(self.isLeaf):
-            return result
+            return self.value
         else:
             t_reset=self.threshold
-            #t_reset=int(math.ceil(self.threshold - 1) + 1)
-            #print(self.threshold)
-            
-            if self.is_x:
-                if x <= self.threshold:
-                    return self.children[0].evaluate_helper(t_reset-x,y,True)
-                else:
-                    return self.children[1].evaluate_helper(x-t_reset,y,False)
-            else:
-                if y <= self.threshold:
-                    return self.children[0].evaluate_helper(x,t_reset-y,True)
-                else:
-                    return self.children[1].evaluate_helper(x,y-t_reset,False)
 
-    def evaluate(self, x,y):
+            if self.is_x:
+                if x < self.threshold:
+                    return self.children[0].evaluate_helper(x,y)
+                else:
+                    return self.children[1].evaluate_helper(x-t_reset,y)
+            else:
+                if y < self.threshold:
+                    return self.children[0].evaluate_helper(x,y)
+                else:
+                    return self.children[1].evaluate_helper(x,y-t_reset)
+
+    def evaluate(self,x,y):
         # t_reset=int(math.ceil(self.threshold - 1) + 1)
         t_reset=self.threshold
 
         if self.is_x:
-            if x <= self.threshold:
-                return self.children[0].evaluate_helper(t_reset-x,y,True)
+            if x < self.threshold:
+                return self.children[0].evaluate_helper(x,y)
             else:
-                return self.children[1].evaluate_helper(x-t_reset,y,False)
+                return self.children[1].evaluate_helper(x-t_reset,y)
         else:
-            if y <= self.threshold:
-                return self.children[0].evaluate_helper(x,t_reset-y,True)
+            if y < self.threshold:
+                return self.children[0].evaluate_helper(x,y)
             else:
-                return self.children[1].evaluate_helper(x,y-t_reset,False)
+                return self.children[1].evaluate_helper(x,y-t_reset)
 
     def build(self,target_thresholds, data_input):
 
@@ -206,7 +212,7 @@ class node:
 
         self.is_x = x_infogain >= y_infogain
         self.threshold = x_thresh if self.is_x else y_thresh
-        #print(self.is_x)
+
         left_data = None
         right_data = None
 
@@ -235,128 +241,163 @@ class node:
         if not left_child.isLeaf:
             left_thresholds = find_thresholds(left_data) 
             self.children[0].build(left_thresholds[:],left_data) 
+        else:
+            if(left_data != []):
+                self.children[0].value = (left_data[0][0])
+            else:
+                l = []
+                for row in right_data:
+                    for column in row:
+                        l.append(column)
+                self.children[0].value = not Counter(l).most_common()[0][0]
 
         if not right_child.isLeaf:
             right_thresholds = find_thresholds(right_data) 
             self.children[1].build(right_thresholds[:],right_data)
+        else:
+            if(right_data != []):
+                self.children[1].value = (right_data[0][0])
+            else:
+                l = []
+                for row in left_data:
+                    for column in row:
+                        l.append(column)
+                self.children[1].value = not Counter(l).most_common()[0][0]
+
+    # def toArray(self):
+    #     #Call from root
+    #     return self.array_helper([])
+
+    # def array_helper(self, tree):
+
+    #     tree.append([self.depth,self.stringify()])
+        
+    #     if(not self.children[0].isLeaf):
+    #         self.children[0].array_helper(tree)
+    #     else:
+    #         tree.append([self.children[0].depth,self.children[0].stringify()])
+
+    #     if(not self.children[1].isLeaf):
+    #         self.children[1].array_helper(tree)
+    #     else:
+    #         tree.append([self.children[1].depth,self.children[1].stringify()])
+
+    #     return tree
+
+    # def stringify_tree(self):
+    #     tree_array = self.toArray()
+    #     max_depth = max(tree_array)[0]
+    #     grid_width = len(tree_array) // 4
+    #     #format into strings
+
+    #     string_array = [""]*(max_depth + 1)
+    #     rows = []
+    #     for node in tree_array: string_array[node[0]] += str(node[1]) + " "
+
+    #     for depth in string_array:
+    #         row = [""]*(2*grid_width + 1)
+
+    #         array_row = depth.split(" ")
+    #         num_of_nodes_per_row = len(array_row)
+
+    #         spacing = (len(row)//(num_of_nodes_per_row*2))
+
+    #         for x in range(len(array_row) - 1):
+
+    #             node = str(array_row[x])
+
+    #             row[x] = node
+
+    #         rows.append(''.join(row))
+
+    #     return rows
+
+    # def print_tree(self):
+    #     rows_as_strings = self.stringify_tree()
+    #     grid_width = len(max(rows_as_strings, key=len)) * 3 
+
+    #     root = rows_as_strings[0]
+    #     left_half_start = rows_as_strings[1][0]
+    #     right_half_start = rows_as_strings[1][1]
+        
     
-    def toArray(self):
-        #Call from root
-        return self.array_helper([])
+    #     #left side
+    #     if(left_half_start=="L"):
+    #         print("   " + "L")
+    #     # else:
 
-    def array_helper(self, tree):
+    #     if(right_half_start=="L"):
+    #         print("   " + "L")
+    #     else:
 
-        tree.append([self.depth,self.stringify()])
-        
-        if(not self.children[0].isLeaf):
-            self.children[0].array_helper(tree)
-        else:
-            tree.append([self.children[0].depth,self.children[0].stringify()])
+    #         num_of_shifts = 0
 
-        if(not self.children[1].isLeaf):
-            self.children[1].array_helper(tree)
-        else:
-            tree.append([self.children[1].depth,self.children[1].stringify()])
+    #         for row in range(len(rows_as_strings)):
+    #             num_of_shifts+=1
 
-        return tree
+    #             printed_row = "\n"
+    #             start_index = 2*row
+    #             for node in rows_as_strings[row]:
+    #                 printed_row += node + " "*num_of_shifts
 
-    def stringify_tree(self):
-        tree_array = self.toArray()
-        max_depth = max(tree_array)[0]
-        grid_width = len(tree_array) // 4
-        #format into strings
+    #             print(" "*2*num_of_shifts + printed_row)
+#_____________________________________________________________________________________________________#
 
-        string_array = [""]*(max_depth + 1)
-        rows = []
-        for node in tree_array: string_array[node[0]] += str(node[1]) + " "
+images = ["abstract", "star","trapezoid","triangle","halloween"]
 
-        for depth in string_array:
-            row = [""]*(2*grid_width + 1)
-
-            array_row = depth.split(" ")
-            num_of_nodes_per_row = len(array_row)
-
-            spacing = (len(row)//(num_of_nodes_per_row*2))
-
-            for x in range(len(array_row) - 1):
-
-                node = str(array_row[x])
-
-                row[x] = node
-
-            rows.append(''.join(row))
-
-        return rows
-
-    def print_tree(self):
-        rows_as_strings = self.stringify_tree()
-        grid_width = len(max(rows_as_strings, key=len)) * 3 
-
-        root = rows_as_strings[0]
-        left_half_start = rows_as_strings[1][0]
-        right_half_start = rows_as_strings[1][1]
-        
-    
-        #left side
-        if(left_half_start=="L"):
-            print("   " + "L")
-        # else:
-
-        if(right_half_start=="L"):
-            print("   " + "L")
-        else:
-
-            num_of_shifts = 0
-
-            for row in range(len(rows_as_strings)):
-                num_of_shifts+=1
-
-                printed_row = "\n"
-                start_index = 2*row
-                for node in rows_as_strings[row]:
-                    printed_row += node + " "*num_of_shifts
-
-                print(" "*2*num_of_shifts + printed_row)
-
-        
-            
-#_______________________________________________________________________________________________#
-
-
-#_______________________________________________________________________________________________#
-
-
-images = ["small.jpg", "shape3.jpg", "mushroom.jpg", "triangle.jpg"]
+printer("\nRunning Image Tests.....\n")
 
 for i in images:
 
-    init_data = build_data_from_image(i)
+    printer("______________________________________  Training "+i+".jpg" + " ______________________________________\n")
+
+    init_data = build_data_from_image("test_images/"+i+".jpg")
     initial_thresholds = find_thresholds(init_data)
     
     tree = node(False,0,None)
     tree.build(initial_thresholds,init_data) #call on the root node
 
-    predicted_image=Image.new(mode = "RGB",size=(len(init_data),len(init_data[1])),color=(255, 255, 255))
+    predicted_image=Image.new(mode="RGB",size=(len(init_data),len(init_data[1])),color=(255,255,255))
 
-    # accuracy = 0
+    total = len(init_data) * len(init_data[1])
+    total_positive,total_negative,accuracy_total,accuracy_positive,accuracy_negative = 0,0,0,0,0
 
-    print(i)
     for x in range(len(init_data)):
         for y in range(len(init_data[1])):
             if tree.evaluate(x,y):
-                #print(tree.evaluate(x,y))
-                predicted_image.putpixel((x,y), (0,0,0))
-                
-            # if(tree.evaluate(x,y) == True and actual_class(x,y) == True):
-            #     accuracy += 1
+                predicted_image.putpixel((x,y),(0,0,0))
 
-    predicted_image.save(i + "_predicted.jpg")
+            if(init_data[x][y]):
+                total_positive += 1
+                if(tree.evaluate(x,y)): accuracy_positive += 1
 
-    #predicted_image.show()
+            if(not init_data[x][y]):
+                total_negative += 1
+                if(not tree.evaluate(x,y)): accuracy_negative += 1
 
-    # print("Accuracy: " + str(accuracy / (original_image.width * original_image.height)))
+            if(tree.evaluate(x,y) == init_data[x][y]):
+                accuracy_total += 1
 
-    
+    img_path = "predicted_images/"+i+"_predicted.jpg"
+
+    accuracy_total /= total
+    accuracy_positive /= total_positive
+    accuracy_negative /= total_negative
+
+    printer("Accuracies: "+i+".jpg\n","green")
+
+    printer("Total Accuracy: " + str(accuracy_total * 100))
+    printer("Positive Accuracy: " + str(accuracy_positive * 100))
+    printer("Negative Accuracy: " + str(accuracy_negative * 100))
+
+    predicted_image.save(img_path)
+
+    printer("\nSaved image in path: " + img_path +"\n")
+
+printer("___________________________________________________________________________________________________________\n")
+
+printer("Done Woot Woot!!\n","magenta")
+
 
 #___________References___________#
 #https://stackoverflow.com/questions/34012886/print-binary-tree-level-by-level-in-python
