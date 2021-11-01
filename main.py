@@ -3,17 +3,42 @@ import math
 import numpy as np
 from collections import Counter
 from termcolor import colored
+import uuid
+from itertools import chain, combinations
+import sys
+from treelib import Node as printed_node
+from treelib import Tree as printed_tree
+
+#Authors: Andrew Siciliano, Christopher Wu
 
 #_____________________________________________Methods__________________________________________________#
 
 verbose = True
 
-def printer(text, color=None): 
+def printer(text, color=None,end=None): 
     if verbose:
-        if color != None:
+        if color != None and end == None:
             print(colored(text, color))
+        elif color != None and end != None:
+            print(colored(text, color),end=end)
         else:
             print(text)
+
+# def data_to_splittable(input_data,width,height):
+
+#     # return_array = [[]*height]*width
+
+#     for element in input_data:
+#         x,y,value = element
+
+#     #return return_array
+
+# def reverse_split(input_data):
+#     return_array = []
+#     for x in len(input_data):
+#         for y in len(input_data[0])
+#             return_array.append([x,y,input_data[x][y]])
+#     return return_array
 
 def build_data_from_image(file_name):
 
@@ -158,6 +183,11 @@ class node:
         self.is_x = is_x
         self.children = [None,None]
         self.value = None
+        self.num_passed = 0
+        self.sub_tree_error_rate = None
+        self.reached_values = []
+        self.num_incorrect = 0
+        self.uuid = str(uuid.uuid4())
 
     def stringify(self):
         if(self.isLeaf):
@@ -165,37 +195,123 @@ class node:
         else:
             return "N"
 
-    def evaluate_helper(self,x,y):
-        if(self.isLeaf):
+    def evaluate_error_rate_of_tree(self,training_set,pruned_ids=None):
+        accuracy_total = 0
+        for x in range(len(training_set)):
+            for y in range(len(training_set[0])):
+                if tree.evaluate(x,y,x,y,training_set,pruned_ids) == training_set[x][y]:
+                    accuracy_total+=1
+        return accuracy_total / (len(training_set)*len(training_set[0]))
+
+    def get_prune_ids(self,c,training_set):
+        sub_trees_per_depth = self.toArray()
+
+        pruned_ids = []
+        min_error = 0
+        
+        done = False
+
+        actual=1-self.evaluate_error_rate_of_tree(training_set)
+
+        for depth in sub_trees_per_depth[::-1]:
+            for i in range(len(depth)):
+                error_test = 1-self.evaluate_error_rate_of_tree(training_set,pruned_ids + depth[len(depth)-1:])
+                if(error_test-actual) < c:
+                    min_error = error_test
+                else:
+                    #print(1-min_error)
+                    done = True
+                    break
+            if (not done):
+                pruned_ids += depth[:]
+            else:
+                break
+        return pruned_ids
+
+    def build_pruned_value_helper(self):
+        if(not self.isLeaf):
+
+            if(len(self.reached_values) != 0):
+                val = Counter(self.reached_values).most_common()[0][0]
+                self.value = val
+                self.num_incorrect = len(self.reached_values)-self.reached_values.count(val)
+            else:
+                self.num_incorrect = 0
+
+        if self.children[0] != None:
+            self.children[0].build_pruned_value_helper()
+        if self.children[1] != None:
+            self.children[1].build_pruned_value_helper()
+
+    def build_pruned_values(self,training_set):
+
+        self.build(find_thresholds(training_set),training_set)
+
+        for x in range(len(training_set)):
+            for y in range(len(training_set[1])):
+                tree.evaluate(x,y,x,y,training_set)
+
+        if(not self.isLeaf):
+
+            #print(Counter(self.reached_values).most_common())
+            if(len(self.reached_values) != 0):
+                val = Counter(self.reached_values).most_common()[0][0]
+                self.value = val
+                self.num_incorrect = len(self.reached_values)-self.reached_values.count(val)
+            else:
+                self.num_incorrect = 0
+
+        if self.children[0] != None:
+            self.children[0].build_pruned_value_helper()
+        if self.children[1] != None:
+            self.children[1].build_pruned_value_helper()
+
+    def evaluate_helper(self,x,y,origin_x,origin_y,data_original,pruned_ids):
+        if origin_x != None and origin_y != None and data_original != None and pruned_ids == None:
+            self.reached_values.append(data_original[origin_x][origin_y])
+
+        if(pruned_ids != None):
+            if(pruned_ids.count(self.uuid) > 0):
+                #Treat pruned ID as a leaf if it is
+                return self.value
+
+        if(self.isLeaf): #or error rate is less than or equal to preset C value
             return self.value
         else:
             t_reset=self.threshold
 
             if self.is_x:
                 if x < self.threshold:
-                    return self.children[0].evaluate_helper(x,y)
+                    return self.children[0].evaluate_helper(x,y,origin_x,origin_y,data_original,pruned_ids)
                 else:
-                    return self.children[1].evaluate_helper(x-t_reset,y)
+                    return self.children[1].evaluate_helper(x-t_reset,y,origin_x,origin_y,data_original,pruned_ids)
             else:
                 if y < self.threshold:
-                    return self.children[0].evaluate_helper(x,y)
+                    return self.children[0].evaluate_helper(x,y,origin_x,origin_y,data_original,pruned_ids)
                 else:
-                    return self.children[1].evaluate_helper(x,y-t_reset)
+                    return self.children[1].evaluate_helper(x,y-t_reset,origin_x,origin_y,data_original,pruned_ids)
 
-    def evaluate(self,x,y):
+    def evaluate(self,x,y,origin_x=None,origin_y=None,data_original=None,pruned_ids=None):
         # t_reset=int(math.ceil(self.threshold - 1) + 1)
         t_reset=self.threshold
 
+        if(pruned_ids != None):
+            if(pruned_ids.count(self.uuid) > 0):
+                return self.value
+
+        if origin_x != None and origin_y != None and data_original != None and pruned_ids == None:
+            self.reached_values.append(data_original[origin_x][origin_y])
+
         if self.is_x:
             if x < self.threshold:
-                return self.children[0].evaluate_helper(x,y)
+                return self.children[0].evaluate_helper(x,y,origin_x, origin_y,data_original,pruned_ids)
             else:
-                return self.children[1].evaluate_helper(x-t_reset,y)
+                return self.children[1].evaluate_helper(x-t_reset,y,origin_x, origin_y,data_original,pruned_ids)
         else:
             if y < self.threshold:
-                return self.children[0].evaluate_helper(x,y)
+                return self.children[0].evaluate_helper(x,y,origin_x, origin_y,data_original,pruned_ids)
             else:
-                return self.children[1].evaluate_helper(x,y-t_reset)
+                return self.children[1].evaluate_helper(x,y-t_reset,origin_x, origin_y,data_original,pruned_ids)
 
     def build(self,target_thresholds, data_input):
 
@@ -242,6 +358,7 @@ class node:
             left_thresholds = find_thresholds(left_data) 
             self.children[0].build(left_thresholds[:],left_data) 
         else:
+            self.parent_of_leaf = True
             if(left_data != []):
                 self.children[0].value = (left_data[0][0])
             else:
@@ -255,6 +372,7 @@ class node:
             right_thresholds = find_thresholds(right_data) 
             self.children[1].build(right_thresholds[:],right_data)
         else:
+            self.parent_of_leaf = True
             if(right_data != []):
                 self.children[1].value = (right_data[0][0])
             else:
@@ -264,86 +382,42 @@ class node:
                         l.append(column)
                 self.children[1].value = not Counter(l).most_common()[0][0]
 
-    # def toArray(self):
-    #     #Call from root
-    #     return self.array_helper([])
+    def toArray(self):
+        #ALL the subtrees
+        #Call from root
+        first_array = self.array_helper([])
+        return_array = []
 
-    # def array_helper(self, tree):
+        for node in first_array:
+            if(len(return_array) <= node[0]):
+                return_array.append([node[1]])
+            else:
+                return_array[node[0]].append(node[1])
 
-    #     tree.append([self.depth,self.stringify()])
-        
-    #     if(not self.children[0].isLeaf):
-    #         self.children[0].array_helper(tree)
-    #     else:
-    #         tree.append([self.children[0].depth,self.children[0].stringify()])
+        return return_array
 
-    #     if(not self.children[1].isLeaf):
-    #         self.children[1].array_helper(tree)
-    #     else:
-    #         tree.append([self.children[1].depth,self.children[1].stringify()])
+    def array_helper(self, tree):
 
-    #     return tree
+        if(not self.isLeaf):
+            tree.append([self.depth,self.uuid])
 
-    # def stringify_tree(self):
-    #     tree_array = self.toArray()
-    #     max_depth = max(tree_array)[0]
-    #     grid_width = len(tree_array) // 4
-    #     #format into strings
+        if(not self.children[0].isLeaf):
+            self.children[0].array_helper(tree)
+        # else:
+        #     tree.append([self.children[0].depth,self.children[0].uuid])
 
-    #     string_array = [""]*(max_depth + 1)
-    #     rows = []
-    #     for node in tree_array: string_array[node[0]] += str(node[1]) + " "
+        if(not self.children[1].isLeaf):
+            self.children[1].array_helper(tree)
+        # else:
+        #     tree.append([self.children[1].depth,self.children[1].uuid])
 
-    #     for depth in string_array:
-    #         row = [""]*(2*grid_width + 1)
+        return tree
 
-    #         array_row = depth.split(" ")
-    #         num_of_nodes_per_row = len(array_row)
-
-    #         spacing = (len(row)//(num_of_nodes_per_row*2))
-
-    #         for x in range(len(array_row) - 1):
-
-    #             node = str(array_row[x])
-
-    #             row[x] = node
-
-    #         rows.append(''.join(row))
-
-    #     return rows
-
-    # def print_tree(self):
-    #     rows_as_strings = self.stringify_tree()
-    #     grid_width = len(max(rows_as_strings, key=len)) * 3 
-
-    #     root = rows_as_strings[0]
-    #     left_half_start = rows_as_strings[1][0]
-    #     right_half_start = rows_as_strings[1][1]
-        
-    
-    #     #left side
-    #     if(left_half_start=="L"):
-    #         print("   " + "L")
-    #     # else:
-
-    #     if(right_half_start=="L"):
-    #         print("   " + "L")
-    #     else:
-
-    #         num_of_shifts = 0
-
-    #         for row in range(len(rows_as_strings)):
-    #             num_of_shifts+=1
-
-    #             printed_row = "\n"
-    #             start_index = 2*row
-    #             for node in rows_as_strings[row]:
-    #                 printed_row += node + " "*num_of_shifts
-
-    #             print(" "*2*num_of_shifts + printed_row)
 #_____________________________________________________________________________________________________#
 
-images = ["abstract", "star","trapezoid","triangle","halloween"]
+#images = ["abstract", "star","trapezoid","triangle","halloween"]
+
+images = ["abstract"]
 
 printer("\nRunning Image Tests.....\n")
 
@@ -352,8 +426,10 @@ for i in images:
     printer("______________________________________  Training "+i+".jpg" + " ______________________________________\n")
 
     init_data = build_data_from_image("test_images/"+i+".jpg")
+
     initial_thresholds = find_thresholds(init_data)
-    
+    #NEED TO CREATE A SMALLER TRAINING SET
+
     tree = node(False,0,None)
     tree.build(initial_thresholds,init_data) #call on the root node
 
@@ -394,12 +470,57 @@ for i in images:
 
     printer("\nSaved image in path: " + img_path +"\n")
 
+    tree.build_pruned_values(init_data)
+
+    pruned_ids_list = []
+
+    printer("Generating Pruned Gif and Images.....\n", "red")
+
+    printer("Now Initiliazing Parameters for the Pruned Trees .....")
+    for x in range(25):
+        if (x != 0):
+            printer("Progress: " + str(100*(x/25)//1 - .01) + "% \r","green","")
+        else:
+            printer("Progress: " + str(0.0) + "% \r","green","")
+        pruned_ids_list.append([x,tree.get_prune_ids((x/100),init_data)])
+
+    printer("Done Initiliazing Parameters!\n", "green")
+    printer("Now creating sequence of images.....")
+
+    pruned_images = []
+    first_path = ""
+
+    for c in pruned_ids_list:
+        pruned_image = Image.new(mode="RGB",size=(len(init_data),len(init_data[1])),color=(255,255,255))
+
+        pruned_image_path =  i + "_pruned/c_" + str(c[0]) + ".jpg"
+        if first_path == "":
+            first_path = pruned_image_path
+
+        for x in range(len(init_data)):
+            for y in range(len(init_data[1])):
+                if tree.evaluate(x,y,x,y,init_data,c[1]):
+                    pruned_image.putpixel((x,y),(0,0,0))
+
+        pruned_image.save(pruned_image_path)
+        pruned_images.append(np.asarray(Image.open(pruned_image_path)))
+
+    printer("\nSaved pruned images in diectory : /"+i+"_pruned\n")
+
+    the_gif_format = [Image.fromarray(img) for img in pruned_images]
+
+    first = Image.open(first_path)
+
+    first.save("gifs/" + i + '_pruned_animation.gif', save_all=True, append_images=the_gif_format,optimize=False, duration=200, loop=0)
+
+    printer("Saved pruned image gif in path: " + i + '_pruned_animation.gif' +"\n")
+    printer("Finished with " + i + ".jpg","magenta")
+
 printer("___________________________________________________________________________________________________________\n")
 
 printer("Done Woot Woot!!\n","magenta")
 
-
 #___________References___________#
 #https://stackoverflow.com/questions/34012886/print-binary-tree-level-by-level-in-python
 #https://stackoverflow.com/questions/138250/how-to-read-the-rgb-value-of-a-given-pixel-in-python
-
+#https://stackoverflow.com/questions/65340769/getting-attributeerror-im-must-have-seek-method-while-trying-to-save-as-gif
